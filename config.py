@@ -55,7 +55,7 @@ class CFG:
         deberta-xlarge
     """
     model = 'microsoft/deberta-v3-base' #If you want to train on the kaggle platform, v3-base is realistic. v3-large will time out.
-    loss_func = 'SmoothL1' # 'SmoothL1', 'RMSE'
+    loss_func = 'RMSE' # 'SmoothL1', 'RMSE'
     gradient_checkpointing = True
     scheduler = 'cosine'
     batch_scheduler = True
@@ -103,13 +103,13 @@ class CFG:
     awp = False
     adv_lr = 1
     adv_eps = 0.2
-    unscale = False
+    unscale = True
     eps = 1e-6
     betas = (0.9, 0.999)
     max_len = 512
     weight_decay = 0.01
     gradient_accumulation_steps = 1
-    max_grad_norm = 1000
+    max_grad_norm = 1000    # grad clip
     target_cols = ['cohesion', 'syntax', 'vocabulary', 'phraseology', 'grammar', 'conventions']
     seed = 42
     cv_seed = 42

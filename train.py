@@ -387,14 +387,14 @@ if __name__ == '__main__':
         # Tokenizer
         CFG.tokenizer = AutoTokenizer.from_pretrained(CFG.model)
         CFG.tokenizer.save_pretrained(CFG.OUTPUT_DIR + 'tokenizer')
-        #max_len
-        # if 'deberta' in CFG.model:# and 'large' not in CFG.model:
-        #     lengths = []
-        #     tk0 = tqdm(CFG.df_train['full_text'].fillna('').values, total = len(CFG.df_train))
-        #     for text in tk0:
-        #         length = len(CFG.tokenizer(text, add_special_tokens = False)['input_ids'])
-        #         lengths.append(length)
-        #     CFG.max_len = max(lengths) + 2
+        # max_len
+        if 'deberta' in CFG.model:  # and 'large' not in CFG.model:
+            lengths = []
+            tk0 = tqdm(CFG.df_train['full_text'].fillna('').values, total=len(CFG.df_train))
+            for text in tk0:
+                length = len(CFG.tokenizer(text, add_special_tokens=False)['input_ids'])
+                lengths.append(length)
+            CFG.max_len = max(lengths) + 2
         LOGGER.info(f'max_len: {CFG.max_len}')
 
         if CFG.train:

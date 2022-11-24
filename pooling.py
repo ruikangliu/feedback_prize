@@ -195,7 +195,6 @@ class Conv1dPooling(Pooling):
 """
     Hidden States Output
 """
-#There may be a bug in my implementation because it does not work well.
 class WeightedLayerPooling(Pooling):
     def __init__(self, hidden_size, n_layer=4):
         super(WeightedLayerPooling, self).__init__()
