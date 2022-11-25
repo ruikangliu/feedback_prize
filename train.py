@@ -353,7 +353,10 @@ def parse_args():
     parser.add_argument("--model", help="microsoft/deberta-v3-base", default=None, type=str)
     parser.add_argument("--pooling", help="mean", default=None, type=str)
     parser.add_argument("--loss_func", help="SmoothL1 / RMSE", default=None, type=str)
-    parser.add_argument("--gpu_id", default='2', type=str)
+    parser.add_argument("--decouple_pooling", help="decoupled pooling for different targets", action='store_true')
+    parser.add_argument("--gpu_id", default=None, type=str)
+    parser.add_argument("--note", default='', type=str)
+    parser.add_argument("--epochs", default=None, type=int)
     parser.add_argument("--zip_res", action='store_true')
 
     args = parser.parse_args()
@@ -363,7 +366,7 @@ def update_config(cfg, args):
     args = vars(args)
     for k, v in args.items():
         if v is not None:
-            exec(f'cfg.{k} = \"{v}\"')
+            exec(f'cfg.{k} = args["{k}"]')
 
 
 if __name__ == '__main__':

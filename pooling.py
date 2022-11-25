@@ -98,6 +98,22 @@ class MeanPooling(Pooling):
         return self.fc(mean_embeddings) if self.use_fc is True else mean_embeddings
 
 
+class MeanAugPooling(Pooling):
+    def __init__(self, hidden_size, use_fc=True):
+        super(MeanPooling, self).__init__()
+        self.use_fc = use_fc
+        self.fc = nn.Linear(hidden_size, CFG.n_targets)
+        self._init_weights(self.fc)
+        
+    def forward(self, last_hidden_state, attention_mask):
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+        sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, 1)
+        sum_mask = input_mask_expanded.sum(1)
+        sum_mask = torch.clamp(sum_mask, min = 1e-9)
+        mean_embeddings = sum_embeddings/sum_mask
+        return self.fc(mean_embeddings) if self.use_fc is True else mean_embeddings
+
+
 class MaxPooling(Pooling):
     def __init__(self, hidden_size, use_fc=True):
         super(MaxPooling, self).__init__()
@@ -196,13 +212,13 @@ class Conv1dPooling(Pooling):
     Hidden States Output
 """
 class WeightedLayerPooling(Pooling):
-    def __init__(self, hidden_size, n_layer=4):
+    def __init__(self, hidden_size, n_layer=4, n_target=CFG.n_targets):
         super(WeightedLayerPooling, self).__init__()
         self.n_layer = n_layer
         self.layer_weights = nn.Parameter(
                 torch.tensor([1] * (n_layer), dtype=torch.float)
             )
-        self.fc = nn.Linear(hidden_size, CFG.n_targets)
+        self.fc = nn.Linear(hidden_size, n_target)
         self._init_weights(self.fc)
 
     def forward(self, layer_wise_embed):
@@ -214,7 +230,7 @@ class WeightedLayerPooling(Pooling):
    
     
 class LayerWiseAttnPooling(Pooling):
-    def __init__(self, hidden_size, n_layer=4, hiddendim_fc=128):
+    def __init__(self, hidden_size, n_layer=4, n_target=CFG.n_targets, hiddendim_fc=128):
         super(LayerWiseAttnPooling, self).__init__()
         self.n_layer = n_layer
         self.hidden_size = hidden_size
@@ -225,7 +241,7 @@ class LayerWiseAttnPooling(Pooling):
         w_ht = np.random.normal(loc=0.0, scale=0.1, size=(self.hidden_size, self.hiddendim_fc))
         self.w_h = nn.Parameter(torch.from_numpy(w_ht)).float().to(CFG.device)
         
-        self.fc = nn.Linear(self.hiddendim_fc, CFG.n_targets)
+        self.fc = nn.Linear(self.hiddendim_fc, n_target)
         self._init_weights(self.fc)
 
     def forward(self, layer_wise_embed):
@@ -243,10 +259,10 @@ class LayerWiseAttnPooling(Pooling):
 
     
 class LayerWiseCLSPooling(Pooling):
-    def __init__(self, hidden_size, n_layer=4):
+    def __init__(self, hidden_size, n_layer=4, n_target=CFG.n_targets):
         super(LayerWiseCLSPooling, self).__init__()
         self.n_layer = n_layer
-        self.fc = nn.Linear(hidden_size, CFG.n_targets)
+        self.fc = nn.Linear(hidden_size, n_target)
         self._init_weights(self.fc)
 
     def forward(self, layer_wise_embed):
@@ -256,11 +272,11 @@ class LayerWiseCLSPooling(Pooling):
    
     
 class ConcatPooling(Pooling):
-    def __init__(self, hidden_size, n_layer=4):
+    def __init__(self, hidden_size, n_layer=4, n_target=CFG.n_targets):
         super(ConcatPooling, self).__init__()
         self.hidden_size = hidden_size
         self.n_layer = n_layer
-        self.fc = nn.Linear(hidden_size * n_layer, CFG.n_targets)
+        self.fc = nn.Linear(hidden_size * n_layer, n_target)
         self._init_weights(self.fc)
 
     def forward(self, layer_wise_embed):
@@ -271,13 +287,13 @@ class ConcatPooling(Pooling):
     
 
 class LSTMPooling(Pooling):
-    def __init__(self, hidden_size, n_layer, hiddendim_lstm=256, bidirectional=True):
+    def __init__(self, hidden_size, n_layer, n_target=CFG.n_targets, hiddendim_lstm=256, bidirectional=True):
         super(LSTMPooling, self).__init__()
         self.n_layer = n_layer
         self.hidden_size = hidden_size
         self.hiddendim_lstm = hiddendim_lstm
         self.lstm = nn.LSTM(self.hidden_size, self.hiddendim_lstm, batch_first=True, bidirectional=bidirectional)
-        self.fc = nn.Linear(self.hiddendim_lstm if bidirectional is False else 2 * self.hiddendim_lstm, CFG.n_targets)
+        self.fc = nn.Linear(self.hiddendim_lstm if bidirectional is False else 2 * self.hiddendim_lstm, n_target)
         self._init_weights(self.fc)
     
     def forward(self, layer_wise_embed):
@@ -289,13 +305,13 @@ class LSTMPooling(Pooling):
 
 
 class GRUPooling(Pooling):
-    def __init__(self, hidden_size, n_layer, hiddendim_lstm=256, bidirectional=True):
+    def __init__(self, hidden_size, n_layer, n_target=CFG.n_targets, hiddendim_lstm=256, bidirectional=True):
         super(GRUPooling, self).__init__()
         self.n_layer = n_layer
         self.hidden_size = hidden_size
         self.hiddendim_lstm = hiddendim_lstm
         self.gru = nn.GRU(self.hidden_size, self.hiddendim_lstm, batch_first=True, bidirectional=bidirectional)
-        self.fc = nn.Linear(self.hiddendim_lstm if bidirectional is False else 2 * self.hiddendim_lstm, CFG.n_targets)
+        self.fc = nn.Linear(self.hiddendim_lstm if bidirectional is False else 2 * self.hiddendim_lstm, n_target)
         self._init_weights(self.fc)
     
     def forward(self, layer_wise_embed):
@@ -304,4 +320,23 @@ class GRUPooling(Pooling):
         out, _ = self.gru(hidden_states, None)
         out = out[:, -1, :]
         return self.fc(out)
+
+
+class DecoupledPooling(nn.Module):
+    def __init__(self, pooling_class, hidden_size, n_layer=4):
+        super(DecoupledPooling, self).__init__()
+        self.n_layer = n_layer
+        self.heads = []
+        for i in range(CFG.n_targets):
+            self.heads.append(pooling_class(hidden_size, n_layer, n_target=1))
+        self.heads = nn.ModuleList(self.heads)
+
+    def forward(self, layer_wise_embed):
+        # layer_wise_embed: shape -> [n_layer, bs, hidden_size]
+        res = []
+        for i in range(CFG.n_targets):
+            res.append(self.heads[i](layer_wise_embed))
+        res = torch.cat(res, 1)
+
+        return res
 

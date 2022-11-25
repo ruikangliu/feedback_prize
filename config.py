@@ -38,7 +38,7 @@ class CFG:
     debug = False
     offline = False
     models_path = 'FB3-models'
-    epochs = 5
+    epochs = 8
     save_all_models = False
     competition = 'FB3'
     apex = True
@@ -92,7 +92,10 @@ class CFG:
             gru: GRU pooling (slow)
     """ 
     pooling = 'mean'
+    decouple_pooling = False
     n_layer = 4
+    # mean aug
+    
     #init_weight
     init_weight = 'normal' # normal, xavier_uniform, xavier_normal, kaiming_uniform, kaiming_normal, orthogonal
     #re-init
@@ -118,6 +121,7 @@ class CFG:
     batch_size = 4
     n_targets = 6
     gpu_id = 0
+    note = ''   # exp notes
     
     train_file = './dataset/train.csv'
     test_file = './dataset/test.csv'
@@ -133,7 +137,8 @@ def config_setup():
         CFG.identifier = f'{CFG.model.split("/")[1]}'
     else:
         CFG.identifier = f'{CFG.model}'
-    CFG.identifier += f'/{CFG.pooling}_{CFG.loss_func}'
+    decouple_note = '_decouple' if CFG.decouple_pooling is True else ''
+    CFG.identifier += f'/{CFG.pooling}_{CFG.loss_func}{decouple_note}/{CFG.note}'
     print(CFG.identifier)
 
     # Read train and split with MultilabelStratifiedKFold
@@ -163,4 +168,13 @@ def config_setup():
             CFG.df_train = CFG.df_train.sample(n = 100, random_state = CFG.seed).reset_index(drop=True)
             
     os.makedirs(CFG.OUTPUT_DIR, exist_ok=True)    
-    print(CFG.OUTPUT_DIR)  
+    print(CFG.OUTPUT_DIR)
+
+    # save config file
+    with open(os.path.join(CFG.OUTPUT_DIR, 'cfg.json'), 'w') as f:
+        cfg_dict = dict(vars(CFG))
+        del cfg_dict['df_train']
+        for k in list(cfg_dict.keys()):
+            if k.startswith('__') and k.endswith('__'):
+                del cfg_dict[k]
+        json.dump(cfg_dict, f, indent=4)

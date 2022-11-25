@@ -121,18 +121,25 @@ class FB3Model(nn.Module):
             self.pool = pooling.MeanMaxPooling(self.config.hidden_size)
         elif CFG.pooling == 'conv1d':
             self.pool = pooling.Conv1dPooling(self.config.hidden_size)
-        elif CFG.pooling == 'weightedlayer':
-            self.pool = pooling.WeightedLayerPooling(self.config.hidden_size, CFG.n_layer) 
-        elif CFG.pooling == 'attn_layer_wise':
-            self.pool = pooling.LayerWiseAttnPooling(self.config.hidden_size, CFG.n_layer) 
-        elif CFG.pooling == 'layerwise_cls':
-            self.pool = pooling.LayerWiseCLSPooling(self.config.hidden_size, CFG.n_layer) 
-        elif CFG.pooling == 'concat':
-            self.pool = pooling.ConcatPooling(self.config.hidden_size, CFG.n_layer) 
-        elif CFG.pooling == 'lstm':
-            self.pool = pooling.LSTMPooling(self.config.hidden_size, CFG.n_layer) 
-        elif CFG.pooling == 'gru':
-            self.pool = pooling.GRUPooling(self.config.hidden_size, CFG.n_layer)        
+        else:
+            if CFG.pooling == 'weightedlayer':
+                pooling_class = pooling.WeightedLayerPooling
+            elif CFG.pooling == 'attn_layer_wise':
+                pooling_class = pooling.LayerWiseAttnPooling
+            elif CFG.pooling == 'layerwise_cls':
+                pooling_class = pooling.LayerWiseCLSPooling
+            elif CFG.pooling == 'concat':
+                pooling_class = pooling.ConcatPooling
+            elif CFG.pooling == 'lstm':
+                pooling_class = pooling.LSTMPooling
+            elif CFG.pooling == 'gru':
+                pooling_class = pooling.GRUPooling
+            else:
+                raise NotImplementedError 
+            if CFG.decouple_pooling is False:
+                self.pool = pooling_class(self.config.hidden_size, CFG.n_layer) 
+            else:
+                self.pool = pooling.DecoupledPooling(pooling_class, self.config.hidden_size, CFG.n_layer) 
         
         # self.fc = nn.Linear(self.config.hidden_size, self.CFG.n_targets)
         # self._init_weights(self.fc)
@@ -195,13 +202,18 @@ class FB3Model(nn.Module):
     
     def feature(self, inputs):
         outputs = self.model(**inputs)
-        if not CFG.pooling in ['weightedlayer', 'attn_layer_wise', 'layerwise_cls', 'concat', 'lstm', 'gru']:
+        if CFG.pooling in ['mean', 'max', 'min', 'attention', 'cls', 'mean_max', 'conv1d']:
             last_hidden_states = outputs.last_hidden_state
             feature = self.pool(last_hidden_states, inputs['attention_mask'])
         else:
-            all_layer_embeddings = outputs.hidden_states
-            layer_embeddings = torch.stack(all_layer_embeddings)[-CFG.n_layer:, :, 0, :]
-            feature = self.pool(layer_embeddings)
+            all_layer_embeddings = torch.stack(outputs.hidden_states)[-CFG.n_layer:]
+            attention_mask = inputs['attention_mask'].unsqueeze(0).unsqueeze(-1).float()
+            # use mean pooling for each layer
+            sum_embeddings = torch.sum(all_layer_embeddings * attention_mask, 2)
+            sum_mask = attention_mask.sum(2)
+            sum_mask = torch.clamp(sum_mask, min = 1e-9)
+            mean_embeddings = sum_embeddings / sum_mask
+            feature = self.pool(mean_embeddings)
             
         return feature
     
